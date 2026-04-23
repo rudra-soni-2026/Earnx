@@ -29,4 +29,7 @@ const WithdrawalSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Index for faster history retrieval
+WithdrawalSchema.index({ userId: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Withdrawal', WithdrawalSchema);

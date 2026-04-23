@@ -19,10 +19,7 @@ exports.requestWithdrawal = async (req, res) => {
       return res.status(400).json({ msg: `Minimum withdrawal is ${minAmt} Coins` });
     }
 
-    // Deduct balance
-    user.walletBalance -= amount;
-    await user.save();
-
+    // optimized: Use Promise.all for parallel database operations
     const withdrawal = new Withdrawal({
       userId: req.user.id,
       amount,
@@ -30,9 +27,7 @@ exports.requestWithdrawal = async (req, res) => {
       payoutId,
       status: 'PENDING'
     });
-    await withdrawal.save();
 
-    // Log Transaction as DEBIT
     const transaction = new Transaction({
         userId: req.user.id,
         type: 'DEBIT',
@@ -40,16 +35,23 @@ exports.requestWithdrawal = async (req, res) => {
         description: `Withdrawal Request (${method})`,
         status: 'PENDING'
     });
-    await transaction.save();
 
-    // Create Notification
     const notification = new Notification({
         userId: req.user.id,
         title: 'Withdrawal Pending ⏳',
         message: `Your request for ${amount} coins via ${method} is being processed. It usually takes 24-48 hours.`,
         type: 'TRANSACTION'
     });
-    await notification.save();
+
+    // Deduct balance from memory first, then save all
+    user.walletBalance -= amount;
+
+    await Promise.all([
+        user.save(),
+        withdrawal.save(),
+        transaction.save(),
+        notification.save()
+    ]);
 
     res.json({ msg: 'Withdrawal request submitted', withdrawal, newBalance: user.walletBalance });
   } catch (err) {
