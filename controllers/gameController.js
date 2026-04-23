@@ -54,17 +54,16 @@ exports.endGame = async (req, res) => {
       return res.status(400).json({ msg: session.reason });
     }
 
-    // Add reward
-    await User.findByIdAndUpdate(req.user.id, {
-      $inc: { walletBalance: config.rewardPerGame }
-    });
-
-    session.status = 'COMPLETED';
-    session.endTime = endTime;
-    session.isRewardClaimed = true;
-    await session.save();
+    // Optimized: Update user and session in parallel
+    await Promise.all([
+      User.findByIdAndUpdate(req.user.id, {
+        $inc: { walletBalance: config.rewardPerGame }
+      }),
+      session.save()
+    ]);
 
     res.json({ msg: 'Reward added', reward: config.rewardPerGame });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -84,9 +83,8 @@ exports.updateWallet = async (req, res) => {
 
     user.walletBalance += amount;
     user.todayEarnings += amount;
-    await user.save();
 
-    // Log Transaction
+    // Optimized: Run database operations in parallel
     const transaction = new Transaction({
         userId: req.user.id,
         type: 'CREDIT',
@@ -94,18 +92,22 @@ exports.updateWallet = async (req, res) => {
         description: `Game Reward (${gameKey})`,
         gameKey: gameKey
     });
-    await transaction.save();
 
-    // Create Notification
     const notification = new Notification({
         userId: req.user.id,
         title: 'Coins Credited! 💰',
         message: `You just earned ${amount} coins from ${gameKey}. Keep it up!`,
         type: 'TRANSACTION'
     });
-    await notification.save();
+
+    await Promise.all([
+        user.save(),
+        transaction.save(),
+        notification.save()
+    ]);
 
     res.json({ msg: 'Wallet updated!', newBalance: user.walletBalance, todayEarnings: user.todayEarnings });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -121,9 +123,8 @@ exports.claimAdReward = async (req, res) => {
 
     user.walletBalance += rewardAmount;
     user.todayEarnings += rewardAmount;
-    await user.save();
 
-    // Log Transaction
+    // Optimized: Run database operations in parallel
     const transaction = new Transaction({
         userId: req.user.id,
         type: 'CREDIT',
@@ -131,18 +132,22 @@ exports.claimAdReward = async (req, res) => {
         description: 'Quick Ad Reward',
         gameKey: 'ad_reward'
     });
-    await transaction.save();
 
-    // Create Notification
     const notification = new Notification({
         userId: req.user.id,
         title: 'Ad Reward! 📺',
         message: `You earned ${rewardAmount} coins for watching a Quick Ad.`,
         type: 'TRANSACTION'
     });
-    await notification.save();
+
+    await Promise.all([
+        user.save(),
+        transaction.save(),
+        notification.save()
+    ]);
 
     res.json({ msg: 'Reward claimed!', reward: rewardAmount, newBalance: user.walletBalance });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

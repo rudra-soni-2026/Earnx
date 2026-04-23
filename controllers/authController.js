@@ -10,13 +10,37 @@ const createToken = (userId) => {
 
 // @desc Register with Email/Password
 exports.register = async (req, res) => {
-  const { email, password, deviceId, name } = req.body;
+  const { email, password, deviceId, name, referredBy } = req.body;
   try {
-    let user = await User.findOne({ email });
+    // Optimized: Use lean() for faster lookup
+    let user = await User.findOne({ email }).lean();
     if (user) return res.status(400).json({ msg: 'User already exists' });
-     console.log("idsiufysiudf")
+
+
     const referralCode = crypto.randomBytes(4).toString('hex').toUpperCase();
-    user = new User({ email, password, deviceId, referralCode, name });
+    
+    // Check if referred by someone
+    let referrer = null;
+    let initialBalance = 0;
+    
+    if (referredBy) {
+      referrer = await User.findOne({ referralCode: referredBy });
+      if (referrer) {
+        initialBalance = 50; // New user gets 50 coins welcome bonus
+        referrer.walletBalance += 100; // Referrer gets 100 coins
+        await referrer.save();
+      }
+    }
+
+    user = new User({ 
+      email, 
+      password, 
+      deviceId, 
+      referralCode, 
+      name,
+      walletBalance: initialBalance,
+      referredBy: referrer ? referrer._id : null
+    });
 
     // Hash password
     const salt = await bcrypt.genSalt(10);
@@ -35,8 +59,10 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
+    // Optimized: Use lean() for faster lookup if we don't need to save later
     let user = await User.findOne({ email });
     if (!user) return res.status(400).json({ msg: 'Invalid Credentials' });
+
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ msg: 'Invalid Credentials' });
@@ -74,8 +100,9 @@ exports.googleLogin = async (req, res) => {
 // @desc Get Current User Profile
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id).select('-password').lean();
     res.json(user);
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

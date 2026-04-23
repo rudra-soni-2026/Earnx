@@ -48,8 +48,13 @@ const UserSchema = new mongoose.Schema({
     default: false
   },
   fcmToken: {
-    type: String
+    type: String,
+    default: ""
   }
 }, { timestamps: true });
+
+// Index for faster lookups
+UserSchema.index({ deviceId: 1 });
+UserSchema.index({ email: 1 });
 
 module.exports = mongoose.model('User', UserSchema);

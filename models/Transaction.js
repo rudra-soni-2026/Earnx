@@ -31,4 +31,7 @@ const TransactionSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Composite index for fast history retrieval
+TransactionSchema.index({ userId: 1, date: -1 });
+
 module.exports = mongoose.model('Transaction', TransactionSchema);
