@@ -50,6 +50,10 @@ const UserSchema = new mongoose.Schema({
   fcmToken: {
     type: String,
     default: ""
+  },
+  lastScratchDate: {
+    type: String,
+    default: ""
   }
 }, { timestamps: true });
 

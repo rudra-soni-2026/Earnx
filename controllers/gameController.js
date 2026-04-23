@@ -83,8 +83,12 @@ exports.updateWallet = async (req, res) => {
 
     user.walletBalance += amount;
     user.todayEarnings += amount;
+    
+    // Update scratch date if applicable
+    if (gameKey === 'scratch_win') {
+      user.lastScratchDate = new Date().toISOString().split('T')[0];
+    }
 
-    // Optimized: Run database operations in parallel
     const transaction = new Transaction({
         userId: req.user.id,
         type: 'CREDIT',
@@ -106,7 +110,7 @@ exports.updateWallet = async (req, res) => {
         notification.save()
     ]);
 
-    res.json({ msg: 'Wallet updated!', newBalance: user.walletBalance, todayEarnings: user.todayEarnings });
+    res.json({ msg: 'Wallet updated!', newBalance: user.walletBalance, todayEarnings: user.todayEarnings, lastScratchDate: user.lastScratchDate });
 
   } catch (err) {
     console.error(err.message);
